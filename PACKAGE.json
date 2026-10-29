@@ -2,7 +2,7 @@
     "name": "com.holypastry.bakery.translate",
     "version": "0.0.1",
     "displayName": "Bakery Translate",
-    "description": "A wrapper around Timelines ",
+    "description": "Wrapper around the localization package",
     "unity": "2022.3",
     "unityRelease": "42f1",
     "hideInEditor": false,
