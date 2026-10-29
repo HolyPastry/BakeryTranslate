@@ -1,0 +1,14 @@
+{
+    "name": "com.holypastry.bakery.translate",
+    "version": "0.0.1",
+    "displayName": "Bakery Translate",
+    "description": "A wrapper around Timelines ",
+    "unity": "2022.3",
+    "unityRelease": "42f1",
+    "hideInEditor": false,
+    "author": {
+        "name": "Sebastien Berton",
+        "email": "sebasti1.berton@gmail.com",
+        "url": "https://github.com/HolyPastry"
+    }
+}
