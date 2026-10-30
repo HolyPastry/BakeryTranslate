@@ -6,8 +6,6 @@ namespace Bakery.Translate
     [CustomEditor(typeof(TranslationController))]
     public class MasterSheetImporterEditor : Editor
     {
-        private bool importing = false;
-
         public override async void OnInspectorGUI()
         {
             DrawDefaultInspector();
@@ -17,14 +15,7 @@ namespace Bakery.Translate
             }
             if (GUILayout.Button("Sync Localization"))
             {
-                if (importing)
-                {
-                    Debug.LogWarning("Import Process already in progress");
-                    return;
-                }
-                importing = true;
                 await ((TranslationController)target).Import();
-                importing = false;
             }
         }
     }
