@@ -15,7 +15,7 @@ namespace Bakery.Translate
             {
                 ((TranslationController)target).TestAccess();
             }
-            if (GUILayout.Button("Sync Master Text"))
+            if (GUILayout.Button("Sync Localization"))
             {
                 if (importing)
                 {

@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using UnityEditor;
 using UnityEditor.Localization;
+using UnityEditor.Localization.Plugins.XLIFF.V12;
 using UnityEngine;
 using UnityEngine.Localization.Tables;
 
@@ -53,7 +54,7 @@ namespace Bakery.Translate
                 var filename = GetPoFilename(local.Identifier.Code);
                 if (!FileManager.OpenFile(filename, _exportPoFolder, out string raw))
                 {
-                    CreateNewPoFile(local.Identifier.Code, filename, masterTextEntries);
+                    WritePoFile(local.Identifier.Code, filename, masterTextEntries);
                     continue;
                 }
                 ProcessPoFile(new(masterTextEntries), raw, local.Identifier.Code, filename);
@@ -114,7 +115,11 @@ namespace Bakery.Translate
         )
         {
             List<string> entries = new(raw.Split("\n\n"));
+            if (entries.Count < 2)
+                return;
+            string header = entries[0];
             List<PoEntry> poEntries = new();
+
             for (int i = 1; i < entries.Count; i++)
             {
                 PoEntry newEntry = new();
@@ -163,11 +168,11 @@ namespace Bakery.Translate
             }
             if (deletedEntries.Count > 0)
             {
-                CreateNewPoFile(localeCode, "_deleted_" + filename, deletedEntries);
+                WritePoFile(localeCode, "_deleted_" + filename, deletedEntries);
                 Debug.LogWarning("WARNING - KEYS WERE DELETED OR MODIFIED");
             }
             // Update the PoFile
-            CreateNewPoFile(localeCode, filename, exportEntries);
+            WritePoFile(localeCode, filename, exportEntries, header);
         }
 
         private string GetFileHeader(string languageCode)
@@ -183,13 +188,18 @@ namespace Bakery.Translate
             return export;
         }
 
-        private void CreateNewPoFile(
+        private void WritePoFile(
             string languageCode,
             string filename,
-            List<PoEntry> textEntries
+            List<PoEntry> textEntries,
+            string header = ""
         )
         {
-            var export = GetFileHeader(languageCode);
+            string export;
+            if (string.IsNullOrEmpty(header))
+                export = GetFileHeader(languageCode);
+            else
+                export = header;
 
             foreach (var entry in textEntries)
                 export += entry.ExportString;
