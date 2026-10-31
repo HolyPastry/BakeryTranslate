@@ -1,5 +1,7 @@
 using System.Collections.Generic;
+using System.ComponentModel.Composition.Primitives;
 using UnityEngine;
+using UnityEngine.Localization.SmartFormat.GlobalVariables;
 
 namespace Bakery.Translate
 {
@@ -110,13 +112,17 @@ namespace Bakery.Translate
                         exportString += $"\n#, {Flag}";
 
                     if (!string.IsNullOrEmpty(PreviousUnTranslatedString))
+                    {
                         exportString += $"\n#| {PreviousUnTranslatedString}";
+                    }
 
                     if (!string.IsNullOrEmpty(ExtractedComments))
                         exportString += $"\nmsgctxt \"{ExtractedComments}\"";
 
                     if (!string.IsNullOrEmpty(UntranslatedString))
+                    {
                         exportString += $"\nmsgid \"{UntranslatedString}\"";
+                    }
                     // if (!string.IsNullOrEmpty(TranslatedString))
                     exportString += $"\nmsgstr \"{TranslatedString}\"";
                 }

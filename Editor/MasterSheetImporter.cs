@@ -113,19 +113,9 @@ namespace Bakery.Translate
             string filename
         )
         {
-            List<string> entries = new(raw.Split("\n\n"));
-            if (entries.Count < 2)
+            if (!ParsePoFile(raw, out string header, out List<PoEntry> poEntries))
                 return;
-            string header = entries[0];
-            List<PoEntry> poEntries = new();
 
-            for (int i = 1; i < entries.Count; i++)
-            {
-                PoEntry newEntry = new();
-                if (!newEntry.ParseEntry(entries[i]))
-                    continue;
-                poEntries.Add(newEntry);
-            }
             List<PoEntry> exportEntries = new();
 
             //update or add all entries from the masterEntryList
@@ -156,13 +146,13 @@ namespace Bakery.Translate
                     table.AddEntry(entry.Reference, entry.TranslatedString);
             }
 
-            //Flag as Obsolete entries from the po files that are not in the Master List anymore
+            //Move the deleted entries in a side file
             List<PoEntry> deletedEntries = new();
             foreach (var entry in poEntries)
             {
                 if (masterEntries.Exists(e => e.Reference == entry.Reference))
                     continue;
-                //entry.SetObsolete(true);
+
                 deletedEntries.Add(entry);
             }
             if (deletedEntries.Count > 0)
@@ -172,6 +162,27 @@ namespace Bakery.Translate
             }
             // Update the PoFile
             WritePoFile(localeCode, filename, exportEntries, header);
+        }
+
+        private static bool ParsePoFile(string raw, out string header, out List<PoEntry> poEntries)
+        {
+            poEntries = new();
+            List<string> entries = new(raw.Split("\n\n"));
+            if (entries.Count < 1)
+            {
+                header = null;
+                return false;
+            }
+            header = entries[0];
+            for (int i = 1; i < entries.Count; i++)
+            {
+                PoEntry newEntry = new();
+                if (!newEntry.ParseEntry(entries[i]))
+                    continue;
+                poEntries.Add(newEntry);
+            }
+
+            return true;
         }
 
         private string GetFileHeader(string languageCode)
