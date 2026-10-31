@@ -2,7 +2,6 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using UnityEditor;
 using UnityEditor.Localization;
-using UnityEditor.Localization.Plugins.XLIFF.V12;
 using UnityEngine;
 using UnityEngine.Localization.Tables;
 
@@ -209,12 +208,11 @@ namespace Bakery.Translate
 
         private async Task<List<PoEntry>> ImportSheet(string sheet)
         {
-            List<List<string>> data = await _googleSheetAPI.Import(sheet);
+            CsvFile csv = await _googleSheetAPI.DownloadCSV(sheet);
 
             List<PoEntry> entries = new();
-            for (int i = 1; i < data.Count; i++)
+            foreach (var fields in csv.Content)
             {
-                List<string> fields = data[i];
                 if (fields.Count == 0 || string.IsNullOrEmpty(fields[0]))
                     continue;
                 PoEntry entry = new();
