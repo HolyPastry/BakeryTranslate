@@ -19,7 +19,7 @@ namespace Bakery.Translate
             Table = sheetName;
             Reference = $"{fields[0]}";
             MasterText = fields[1];
-            MaxLength = int.Parse(fields[2]);
+            MaxLength = string.IsNullOrEmpty(fields[2]) ? 0 : int.Parse(fields[2]);
             Context = fields[3];
             Comments = fields[4];
         }
