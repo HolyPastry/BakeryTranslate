@@ -1,7 +1,11 @@
 using System.Collections.Generic;
+using System.IO;
+using System.Text;
 using System.Threading.Tasks;
 using UnityEditor;
 using UnityEditor.Localization;
+using UnityEditor.Localization.Plugins.CSV;
+using UnityEditor.Localization.Plugins.CSV.Columns;
 using UnityEngine;
 using UnityEngine.Localization.Tables;
 
@@ -11,13 +15,10 @@ namespace Bakery.Translate
     public class TranslationController : ScriptableObject
     {
         [SerializeField]
-        private string _filenamePrefix = "po_";
-
-        [SerializeField]
         private string _localizationTableFolder = "";
 
         [SerializeField]
-        private string _exportPoFolder = "Assets/EditorTools/Localization/PoExports";
+        private string _csvExportPath = "Assets/Localization/Exports";
 
         [SerializeField]
         protected GoogleSheetAPI _googleSheetAPI;
@@ -32,37 +33,13 @@ namespace Bakery.Translate
             Debug.Log("==================================");
             Debug.Log("    LOCALIZATION SYNC             ");
 
-            List<PoEntry> masterTextEntries = await ImportMasterEntries();
-
+            List<CsvEntry> masterTextEntries = await ImportMasterEntries();
             UpdateMasterLocalizationTable(masterTextEntries);
-            UpdateLocales(masterTextEntries);
         }
 
-        private string GetPoFilename(string localeCode) => _filenamePrefix + localeCode + ".po";
-
-        private void UpdateLocales(List<PoEntry> masterTextEntries)
+        private async Task<List<CsvEntry>> ImportMasterEntries()
         {
-            var locales = LocalizationEditorSettings.GetLocales();
-
-            foreach (var local in locales)
-            {
-                if (local.Identifier.Code == "en") // skipping the master text language
-                    continue;
-                Debug.Log("=== Syncing Languages");
-                Debug.Log($"==== Language: {local.Identifier.Code}");
-                var filename = GetPoFilename(local.Identifier.Code);
-                if (!FileManager.OpenFile(filename, _exportPoFolder, out string raw))
-                {
-                    WritePoFile(local.Identifier.Code, filename, masterTextEntries);
-                    continue;
-                }
-                ProcessPoFile(new(masterTextEntries), raw, local.Identifier.Code, filename);
-            }
-        }
-
-        private async Task<List<PoEntry>> ImportMasterEntries()
-        {
-            List<PoEntry> masterTextEntries = new();
+            List<CsvEntry> masterTextEntries = new();
             Debug.Log("=== Syncing Master Text");
 
             foreach (var sheet in _sheetList)
@@ -74,16 +51,36 @@ namespace Bakery.Translate
             return masterTextEntries;
         }
 
-        private void UpdateMasterLocalizationTable(List<PoEntry> masterTextEntries)
+        private void UpdateMasterLocalizationTable(List<CsvEntry> masterTextEntries)
         {
-            foreach (var entry in masterTextEntries)
+            foreach (var csvEntry in masterTextEntries)
             {
-                if (GetTable(entry, "en", out var table))
-                    table.AddEntry(entry.Reference, entry.UntranslatedString);
+                if (GetTable(csvEntry, "en", out var table))
+                {
+                    var olderEntry = table.GetEntry(csvEntry.Reference);
+                    bool isFuzzy =
+                        olderEntry == null
+                        || (olderEntry != null && olderEntry.LocalizedValue != csvEntry.MasterText);
+
+                    var entry = table.AddEntry(csvEntry.Reference, csvEntry.MasterText);
+                    var metaData = entry.GetMetadata<BakeryMetaData>();
+
+                    if (metaData == null)
+                    {
+                        metaData = new();
+                        entry.AddMetadata(metaData);
+                    }
+
+                    metaData.Context = csvEntry.Context;
+                    metaData.MaxLength = csvEntry.MaxLength;
+                    metaData.CommentToTranslator = csvEntry.Comments;
+                    metaData.Scope = csvEntry.Table;
+                    metaData.IsFuzzy = isFuzzy;
+                }
             }
         }
 
-        private bool GetTable(PoEntry entry, string localeCode, out StringTable table)
+        private bool GetTable(CsvEntry entry, string localeCode, out StringTable table)
         {
             if (string.IsNullOrEmpty(entry.Table))
             {
@@ -106,127 +103,16 @@ namespace Bakery.Translate
             return true;
         }
 
-        private void ProcessPoFile(
-            List<PoEntry> masterEntries,
-            string raw,
-            string localeCode,
-            string filename
-        )
-        {
-            if (!ParsePoFile(raw, out string header, out List<PoEntry> poEntries))
-                return;
-
-            List<PoEntry> exportEntries = new();
-
-            //update or add all entries from the masterEntryList
-            foreach (var entry in masterEntries)
-            {
-                if (!poEntries.Exists(e => e.Reference == entry.Reference))
-                {
-                    exportEntries.Add(entry);
-                    continue;
-                }
-                var poEntry = poEntries.Find(e => e.Reference == entry.Reference);
-                if (poEntry.UntranslatedString != entry.UntranslatedString)
-                {
-                    poEntry.PreviousUnTranslatedString = poEntry.UntranslatedString;
-                    poEntry.Flag = "fuzzy";
-                }
-                poEntry.Table = entry.Table;
-                poEntry.UntranslatedString = entry.UntranslatedString;
-                poEntry.ExtractedComments = entry.ExtractedComments;
-
-                exportEntries.Add(poEntry);
-            }
-
-            //Update the localization table
-            foreach (var entry in exportEntries)
-            {
-                if (GetTable(entry, localeCode, out var table))
-                    table.AddEntry(entry.Reference, entry.TranslatedString);
-            }
-
-            //Move the deleted entries in a side file
-            List<PoEntry> deletedEntries = new();
-            foreach (var entry in poEntries)
-            {
-                if (masterEntries.Exists(e => e.Reference == entry.Reference))
-                    continue;
-
-                deletedEntries.Add(entry);
-            }
-            if (deletedEntries.Count > 0)
-            {
-                WritePoFile(localeCode, "_deleted_" + filename, deletedEntries);
-                Debug.LogWarning("WARNING - KEYS WERE DELETED OR MODIFIED");
-            }
-            // Update the PoFile
-            WritePoFile(localeCode, filename, exportEntries, header);
-        }
-
-        private static bool ParsePoFile(string raw, out string header, out List<PoEntry> poEntries)
-        {
-            poEntries = new();
-            List<string> entries = new(raw.Split("\n\n"));
-            if (entries.Count < 1)
-            {
-                header = null;
-                return false;
-            }
-            header = entries[0];
-            for (int i = 1; i < entries.Count; i++)
-            {
-                PoEntry newEntry = new();
-                if (!newEntry.ParseEntry(entries[i]))
-                    continue;
-                poEntries.Add(newEntry);
-            }
-
-            return true;
-        }
-
-        private string GetFileHeader(string languageCode)
-        {
-            var export = string.Empty;
-            export += "msgid \"\"";
-            export += "\nmsgstr \"\"";
-            export += "\n\"Project-Id-Version: Good Folk Cafe \\n\"";
-            export += $"\n\"Language: {languageCode}\\n\"";
-            export += "\n\"MIME-Version: 1.0 \\n\"";
-            export += "\n\"Content-Type: text/plain; charset=UTF-8 \\n\"";
-            export += "\n\"Content-Transfer-Encoding: 8bit \\n\"";
-            return export;
-        }
-
-        private void WritePoFile(
-            string languageCode,
-            string filename,
-            List<PoEntry> textEntries,
-            string header = ""
-        )
-        {
-            string export;
-            if (string.IsNullOrEmpty(header))
-                export = GetFileHeader(languageCode);
-            else
-                export = header;
-
-            foreach (var entry in textEntries)
-                export += entry.ExportString;
-
-            FileManager.Create(filename, _exportPoFolder, export);
-        }
-
-        private async Task<List<PoEntry>> ImportSheet(string sheet)
+        private async Task<List<CsvEntry>> ImportSheet(string sheet)
         {
             CsvFile csv = await _googleSheetAPI.DownloadCSV(sheet);
 
-            List<PoEntry> entries = new();
+            List<CsvEntry> entries = new();
             foreach (var fields in csv.Content)
             {
                 if (fields.Count == 0 || string.IsNullOrEmpty(fields[0]))
                     continue;
-                PoEntry entry = new();
+                CsvEntry entry = new();
                 entry.UpdateFromSheet(fields, sheet);
                 entries.Add(entry);
             }
@@ -236,6 +122,60 @@ namespace Bakery.Translate
         internal void TestAccess()
         {
             _googleSheetAPI.TestGoogleAccess();
+        }
+
+        public void ExportCsvTables()
+        {
+            var locales = LocalizationEditorSettings.GetLocales();
+
+            string[] assetFiles = Directory.GetFiles(_localizationTableFolder, "*.asset");
+
+            foreach (var local in locales)
+            {
+                ExportLocalCsvTables(assetFiles, local);
+            }
+        }
+
+        private void ExportLocalCsvTables(
+            string[] assetFiles,
+            UnityEngine.Localization.Locale local
+        )
+        {
+            var code = local.Identifier.Code;
+            if (code == "en")
+                return;
+            var localPath = Path.Combine(_csvExportPath, code);
+            //Directory.CreateDirectory(localPath);
+
+            foreach (var assetPath in assetFiles)
+            {
+                var collection = AssetDatabase.LoadAssetAtPath<StringTableCollection>(assetPath);
+                if (collection == null)
+                    continue;
+
+                var columnMappings = new List<CsvColumns>();
+
+                columnMappings.Add(
+                    new KeyIdColumns { IncludeSharedComments = false, IncludeId = false }
+                );
+
+                columnMappings.Add(
+                    new LocaleColumns { LocaleIdentifier = "en", IncludeComments = false }
+                );
+
+                columnMappings.Add(
+                    new LocaleColumns { LocaleIdentifier = code, IncludeComments = false }
+                );
+                columnMappings.Add(new CsvBakeryColumns { LocaleIdentifier = "en" });
+
+                string exportPath = Path.Combine(localPath, $"{code} - {collection.name}.csv");
+                using (var stream = new StreamWriter(exportPath, false, Encoding.UTF8))
+                {
+                    Csv.Export(stream, collection, columnMappings);
+                }
+
+                Debug.Log($"Successfully exported CSV with custom columns to: {exportPath}");
+            }
         }
     }
 }

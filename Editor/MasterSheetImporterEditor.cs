@@ -13,9 +13,14 @@ namespace Bakery.Translate
             {
                 ((TranslationController)target).TestAccess();
             }
-            if (GUILayout.Button("Sync Localization"))
+            if (GUILayout.Button("Import Master Text"))
             {
                 await ((TranslationController)target).Import();
+            }
+
+            if (GUILayout.Button("Export Csv Tables"))
+            {
+                ((TranslationController)target).ExportCsvTables();
             }
         }
     }
