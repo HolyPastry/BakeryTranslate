@@ -10,5 +10,8 @@
         "name": "Sebastien Berton",
         "email": "sebasti1.berton@gmail.com",
         "url": "https://github.com/HolyPastry"
+    },
+    "dependencies": {
+        "com.unity.localization": "1.5.14"
     }
 }
