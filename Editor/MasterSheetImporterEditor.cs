@@ -6,7 +6,7 @@ namespace Bakery.Translate
     [CustomEditor(typeof(TranslationController))]
     public class MasterSheetImporterEditor : Editor
     {
-        public override async void OnInspectorGUI()
+        public override void OnInspectorGUI()
         {
             DrawDefaultInspector();
             if (GUILayout.Button("Test Access To Google Sheet"))
@@ -15,7 +15,7 @@ namespace Bakery.Translate
             }
             if (GUILayout.Button("Import Master Text"))
             {
-                await ((TranslationController)target).Import();
+                _ = ((TranslationController)target).Import();
             }
 
             if (GUILayout.Button("Export Csv Tables"))
