@@ -61,8 +61,11 @@ namespace Bakery.Translate
                     bool isFuzzy =
                         olderEntry == null
                         || (olderEntry != null && olderEntry.LocalizedValue != csvEntry.MasterText);
+                    var entry = table.GetEntry(csvEntry.Reference);
+                    entry ??= table.AddEntry(csvEntry.Reference, csvEntry.MasterText);
 
-                    var entry = table.AddEntry(csvEntry.Reference, csvEntry.MasterText);
+                    entry.Value = csvEntry.MasterText;
+
                     var metaData = entry.GetMetadata<BakeryMetaData>();
 
                     if (metaData == null)
