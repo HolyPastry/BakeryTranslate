@@ -35,6 +35,7 @@ namespace Bakery.Translate
 
             List<CsvEntry> masterTextEntries = await ImportMasterEntries();
             UpdateMasterLocalizationTable(masterTextEntries);
+            AssetDatabase.SaveAssets();
         }
 
         private async Task<List<CsvEntry>> ImportMasterEntries()
@@ -79,6 +80,7 @@ namespace Bakery.Translate
                     metaData.CommentToTranslator = csvEntry.Comments;
                     metaData.Scope = csvEntry.Table;
                     metaData.IsFuzzy = isFuzzy;
+                    EditorUtility.SetDirty(table);
                 }
             }
         }
@@ -103,6 +105,8 @@ namespace Bakery.Translate
 
             if (table == null)
                 table = collection.AddNewTable(localeCode) as StringTable;
+            EditorUtility.SetDirty(collection);
+            EditorUtility.SetDirty(collection.SharedData);
             return true;
         }
 
